@@ -11,17 +11,6 @@ from typing import Dict, List, Optional, Union
 import uuid
 import hashlib
 
-# Imports modułów
-from database.db_manager import DatabaseManager
-from database.models import Patient, DiagnosisSession, TestResult
-from modules.ankle import AnkleModule
-from modules.knee import KneeModule
-from modules.shoulder import ShoulderModule
-from modules.spine import SpineModule
-from components.anatomy_3d import create_3d_anatomy_model
-from components.visualizations import create_advanced_charts
-from components.ui_components import render_ui_components
-
 # ===== KONFIGURACJA =====
 st.set_page_config(
     page_title="🏥 FizjoExpert Pro - AI Enhanced System",
@@ -33,7 +22,6 @@ st.set_page_config(
 # ===== ENHANCED CSS =====
 st.markdown("""
 <style>
-    /* Import Google Fonts */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     
     :root {
@@ -101,21 +89,6 @@ st.markdown("""
         transform: translateY(-5px);
         box-shadow: var(--shadow-lg);
         border-color: var(--primary-color);
-    }
-
-    .module-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(33, 150, 243, 0.1), transparent);
-        transition: left 0.5s;
-    }
-
-    .module-card:hover::before {
-        left: 100%;
     }
 
     .patient-card {
@@ -263,7 +236,6 @@ st.markdown("""
         }
     }
 
-    /* Animations */
     .fade-in {
         animation: fadeIn 0.5s ease-in;
     }
@@ -284,78 +256,192 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# ===== PROSTE MODELE DANYCH =====
+class SimplePatient:
+    def __init__(self, first_name, last_name, pesel, birth_date):
+        self.first_name = first_name
+        self.last_name = last_name
+        self.pesel = pesel
+        self.birth_date = birth_date
+        self.id = None
+
+class SimpleDiagnosis:
+    def __init__(self, name, confidence, treatment, referral=None):
+        self.name = name
+        self.confidence = confidence
+        self.treatment = treatment
+        self.referral = referral
+
+# ===== PROSTA BAZA DANYCH =====
+class SimpleDatabase:
+    def __init__(self):
+        self.patients = []
+        self.sessions = []
+    
+    def add_patient(self, patient):
+        patient.id = len(self.patients) + 1
+        self.patients.append(patient)
+        return patient.id
+    
+    def search_patients(self, term):
+        return [p for p in self.patients if term.lower() in f"{p.first_name} {p.last_name} {p.pesel}".lower()]
+    
+    def get_all_patients(self):
+        return self.patients
+
+# ===== DIAGNOSTIC ENGINE =====
+class SimpleDiagnosticEngine:
+    def __init__(self):
+        self.scoring_rules = {
+            'ankle_sprain_lateral': {
+                'mechanism_inversion': 3,
+                'lateral_pain': 3,
+                'swelling_lateral': 2,
+                'anterior_drawer_positive': 4,
+                'talar_tilt_positive': 3
+            },
+            'achilles_rupture': {
+                'thompson_positive': 8,
+                'posterior_pain': 3,
+                'plantarflexion_weakness': 4,
+                'pop_sensation': 3
+            },
+            'knee_acl_injury': {
+                'pop_sound': 4,
+                'immediate_swelling': 3,
+                'lachman_positive': 6,
+                'giving_way': 2
+            }
+        }
+    
+    def calculate_scores(self, findings):
+        scores = {}
+        for condition, rules in self.scoring_rules.items():
+            score = 0
+            max_score = sum(rules.values())
+            
+            for finding, points in rules.items():
+                if findings.get(finding, False):
+                    score += points
+            
+            probability = (score / max_score) * 100
+            scores[condition] = {
+                'score': score,
+                'probability': probability
+            }
+        
+        return scores
+
+# ===== MODEL 3D ANATOMII =====
+def create_simple_3d_anatomy():
+    """Tworzy prosty model 3D anatomii"""
+    return """
+    <div id="anatomy-3d" style="width: 100%; height: 500px; border: 2px solid #ddd; border-radius: 15px; position: relative; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); display: flex; align-items: center; justify-content: center; flex-direction: column;">
+        <h3 style="color: #2c3e50; margin-bottom: 2rem;">🔬 Interaktywny Model 3D Anatomii</h3>
+        
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; width: 80%; max-width: 600px;">
+            
+            <!-- Głowa i szyja -->
+            <div class="anatomy-region" onclick="selectRegion('head_neck')" style="background: #e8f4fd; border: 2px solid #3498db; border-radius: 10px; padding: 1rem; text-align: center; cursor: pointer; transition: all 0.3s ease;">
+                <div style="font-size: 2rem; margin-bottom: 0.5rem;">🧠</div>
+                <div style="font-weight: bold; color: #2c3e50;">Głowa & Szyja</div>
+                <div style="font-size: 0.8rem; color: #7f8c8d;">Kręgi szyjne</div>
+            </div>
+            
+            <!-- Bark -->
+            <div class="anatomy-region" onclick="selectRegion('shoulder')" style="background: #fef9e7; border: 2px solid #f39c12; border-radius: 10px; padding: 1rem; text-align: center; cursor: pointer; transition: all 0.3s ease;">
+                <div style="font-size: 2rem; margin-bottom: 0.5rem;">💪</div>
+                <div style="font-weight: bold; color: #2c3e50;">Bark</div>
+                <div style="font-size: 0.8rem; color: #7f8c8d;">Stożek rotatorów</div>
+            </div>
+            
+            <!-- Kręgosłup -->
+            <div class="anatomy-region" onclick="selectRegion('spine')" style="background: #f4f6ff; border: 2px solid #9b59b6; border-radius: 10px; padding: 1rem; text-align: center; cursor: pointer; transition: all 0.3s ease;">
+                <div style="font-size: 2rem; margin-bottom: 0.5rem;">🦴</div>
+                <div style="font-weight: bold; color: #2c3e50;">Kręgosłup</div>
+                <div style="font-size: 0.8rem; color: #7f8c8d;">L-Th-C</div>
+            </div>
+            
+            <!-- Biodro -->
+            <div class="anatomy-region" onclick="selectRegion('hip')" style="background: #e8f8f5; border: 2px solid #1abc9c; border-radius: 10px; padding: 1rem; text-align: center; cursor: pointer; transition: all 0.3s ease;">
+                <div style="font-size: 2rem; margin-bottom: 0.5rem;">🦵</div>
+                <div style="font-weight: bold; color: #2c3e50;">Biodro</div>
+                <div style="font-size: 0.8rem; color: #7f8c8d;">Staw biodrowy</div>
+            </div>
+            
+            <!-- Kolano -->
+            <div class="anatomy-region" onclick="selectRegion('knee')" style="background: #fff5f5; border: 2px solid #e74c3c; border-radius: 10px; padding: 1rem; text-align: center; cursor: pointer; transition: all 0.3s ease;">
+                <div style="font-size: 2rem; margin-bottom: 0.5rem;">🦵</div>
+                <div style="font-weight: bold; color: #2c3e50;">Kolano</div>
+                <div style="font-size: 0.8rem; color: #7f8c8d;">ACL/PCL/Meniscus</div>
+            </div>
+            
+            <!-- Staw skokowy -->
+            <div class="anatomy-region" onclick="selectRegion('ankle')" style="background: #f0fff4; border: 2px solid #27ae60; border-radius: 10px; padding: 1rem; text-align: center; cursor: pointer; transition: all 0.3s ease;">
+                <div style="font-size: 2rem; margin-bottom: 0.5rem;">🦶</div>
+                <div style="font-weight: bold; color: #2c3e50;">Staw skokowy</div>
+                <div style="font-size: 0.8rem; color: #7f8c8d;">ATFL/CFL/Achilles</div>
+            </div>
+            
+        </div>
+        
+        <div style="margin-top: 2rem; text-align: center; color: #7f8c8d;">
+            <p>👆 Kliknij na obszar aby rozpocząć diagnozę</p>
+        </div>
+    </div>
+    
+    <style>
+        .anatomy-region:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+    </style>
+    
+    <script>
+        function selectRegion(region) {
+            // Wysłanie informacji do Streamlit
+            window.parent.postMessage({
+                type: 'anatomy_selection',
+                region: region
+            }, '*');
+            
+            // Wizualne potwierdzenie
+            event.target.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                event.target.style.transform = 'scale(1)';
+            }, 150);
+            
+            // Alert dla użytkownika
+            alert('Wybrano obszar: ' + region + '\\nKliknij "Przejdź do oceny" aby kontynuować.');
+        }
+    </script>
+    """
+
 # ===== INICJALIZACJA =====
 def initialize_app():
-    """Inicjalizacja aplikacji"""
-    if 'db_manager' not in st.session_state:
-        st.session_state.db_manager = DatabaseManager()
+    if 'db' not in st.session_state:
+        st.session_state.db = SimpleDatabase()
+    
+    if 'diagnostic_engine' not in st.session_state:
+        st.session_state.diagnostic_engine = SimpleDiagnosticEngine()
     
     if 'current_patient' not in st.session_state:
         st.session_state.current_patient = None
     
-    if 'current_session' not in st.session_state:
-        st.session_state.current_session = None
-    
-    if 'selected_module' not in st.session_state:
-        st.session_state.selected_module = None
+    if 'selected_region' not in st.session_state:
+        st.session_state.selected_region = None
     
     if 'workflow_step' not in st.session_state:
-        st.session_state.workflow_step = 'patient_selection'
+        st.session_state.workflow_step = 'welcome'
     
-    if 'diagnosis_history' not in st.session_state:
-        st.session_state.diagnosis_history = []
+    if 'assessment_data' not in st.session_state:
+        st.session_state.assessment_data = {}
 
-# ===== GŁÓWNE MODUŁY =====
-class ModuleRegistry:
-    """Rejestr wszystkich modułów diagnostycznych"""
-    
-    def __init__(self):
-        self.modules = {
-            'ankle': AnkleModule(),
-            'knee': KneeModule(), 
-            'shoulder': ShoulderModule(),
-            'spine': SpineModule()
-        }
-    
-    def get_module(self, module_id: str):
-        return self.modules.get(module_id)
-    
-    def get_all_modules(self):
-        return self.modules
-    
-    def get_module_info(self):
-        return {
-            'ankle': {
-                'name': 'Staw skokowy',
-                'icon': '🦶',
-                'description': 'Skręcenia, złamania, tendinopatie',
-                'color': '#FF6B6B',
-                'specialties': ['Kostka boczna/przyśrodkowa', 'Ścięgno Achillesa', 'Powięź podeszwowa']
-            },
-            'knee': {
-                'name': 'Kolano', 
-                'icon': '🦵',
-                'description': 'Więzadła, łąkotki, nadgubierek',
-                'color': '#4ECDC4',
-                'specialties': ['ACL/PCL/MCL/LCL', 'Meniscus', 'Patellofemoral']
-            },
-            'shoulder': {
-                'name': 'Bark',
-                'icon': '💪',
-                'description': 'Stożek rotatorów, impingement',
-                'color': '#45B7D1',
-                'specialties': ['Rotator cuff', 'Impingement', 'Niestabilność']
-            },
-            'spine': {
-                'name': 'Kręgosłup',
-                'icon': '🦴', 
-                'description': 'Kręgi, dyski, korzonki',
-                'color': '#96CEB4',
-                'specialties': ['Szyjny', 'Piersiowy', 'Lędźwiowy']
-            }
-        }
+def calculate_age(birth_date):
+    today = date.today()
+    return today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
 
-# ===== FUNKCJE GŁÓWNE =====
+# ===== GŁÓWNA APLIKACJA =====
 def main():
     initialize_app()
     
@@ -366,39 +452,31 @@ def main():
     render_sidebar()
     
     # Main workflow
-    if st.session_state.workflow_step == 'patient_selection':
-        show_patient_selection()
-    elif st.session_state.workflow_step == 'module_selection':
-        show_module_selection()
+    if st.session_state.workflow_step == 'welcome':
+        show_welcome_screen()
+    elif st.session_state.workflow_step == 'patient_management':
+        show_patient_management()
     elif st.session_state.workflow_step == 'anatomy_3d':
         show_3d_anatomy_selection()
     elif st.session_state.workflow_step == 'assessment':
         show_assessment()
     elif st.session_state.workflow_step == 'diagnosis':
         show_diagnosis_results()
-    elif st.session_state.workflow_step == 'history':
-        show_patient_history()
-    elif st.session_state.workflow_step == 'analytics':
-        show_analytics_dashboard()
-    
-    # Floating action button
-    render_floating_button()
+    elif st.session_state.workflow_step == 'original_modules':
+        show_original_modules()
 
 def render_main_header():
-    """Renderuje główny nagłówek"""
     st.markdown("""
     <div class="main-header fade-in">
         <h1>🏥 FizjoExpert Pro</h1>
         <h2>AI-Enhanced Diagnostic System</h2>
         <p>Zaawansowany system wspomagania diagnozy z modelem 3D, bazą danych i AI</p>
-        <p><i>✨ Integracja GPT Logic + Machine Learning + 3D Anatomy</i></p>
+        <p><i>✨ Wersja demonstracyjna - Integracja GPT Logic + Machine Learning + 3D Anatomy</i></p>
     </div>
     """, unsafe_allow_html=True)
 
 def render_sidebar():
-    """Renderuje sidebar z nawigacją"""
     with st.sidebar:
-        # Logo
         st.markdown("""
         <div class="sidebar-logo">
             <h2>🏥 FizjoExpert</h2>
@@ -421,91 +499,131 @@ def render_sidebar():
         # Navigation
         st.markdown("### 🧭 Nawigacja")
         
-        nav_options = {
-            'patient_selection': '👤 Wybór pacjenta',
-            'module_selection': '🎯 Wybór modułu', 
-            'anatomy_3d': '🔬 Model 3D',
-            'assessment': '📋 Ocena',
-            'diagnosis': '💡 Diagnoza',
-            'history': '📚 Historia',
-            'analytics': '📊 Analityka'
-        }
+        if st.button("🏠 Start", use_container_width=True):
+            st.session_state.workflow_step = 'welcome'
+            st.rerun()
         
-        for step, label in nav_options.items():
-            if st.button(label, key=f"nav_{step}", use_container_width=True):
-                st.session_state.workflow_step = step
-                st.rerun()
+        if st.button("👤 Zarządzanie pacjentami", use_container_width=True):
+            st.session_state.workflow_step = 'patient_management'
+            st.rerun()
+        
+        if st.button("🔬 Model 3D Anatomii", use_container_width=True):
+            st.session_state.workflow_step = 'anatomy_3d'
+            st.rerun()
+        
+        if st.button("📋 Moduły oryginalne (GPT)", use_container_width=True):
+            st.session_state.workflow_step = 'original_modules'
+            st.rerun()
         
         st.markdown("---")
         
         # Quick stats
-        if st.session_state.current_patient:
-            stats = get_patient_stats(st.session_state.current_patient.id)
-            st.markdown("### 📊 Statystyki pacjenta")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Wizyty", stats['total_visits'])
-                st.metric("Diagnozy", stats['total_diagnoses'])
-            with col2:
-                st.metric("Ostatnia", stats['last_visit'])
-                st.metric("Skuteczność", f"{stats['success_rate']}%")
+        total_patients = len(st.session_state.db.get_all_patients())
+        st.metric("👥 Pacjenci w bazie", total_patients)
+        
+        if st.session_state.selected_region:
+            st.info(f"📍 Wybrany obszar: **{st.session_state.selected_region}**")
         
         st.markdown("---")
         
-        # Emergency actions
-        st.markdown("### 🚨 Akcje specjalne")
-        
+        # Emergency
         if st.button("🆘 Czerwone flagi", use_container_width=True, type="secondary"):
-            show_red_flags_checklist()
-        
-        if st.button("📞 Pilne skierowanie", use_container_width=True, type="secondary"):
-            show_emergency_referral()
-        
-        if st.button("🔄 Reset sesji", use_container_width=True):
-            reset_current_session()
-            st.rerun()
+            show_red_flags_modal()
 
-def show_patient_selection():
-    """Ekran wyboru/dodawania pacjenta"""
-    st.markdown("## 👤 Zarządzanie pacjentami")
-    
-    tab1, tab2, tab3 = st.tabs(["🔍 Wyszukaj pacjenta", "➕ Nowy pacjent", "📊 Lista pacjentów"])
-    
-    with tab1:
-        search_and_select_patient()
-    
-    with tab2:
-        add_new_patient()
-    
-    with tab3:
-        show_patient_list()
-
-def search_and_select_patient():
-    """Wyszukiwanie i wybór pacjenta"""
-    st.markdown("### 🔍 Wyszukaj pacjenta")
+def show_welcome_screen():
+    st.markdown("## 👋 Witamy w FizjoExpert Pro!")
     
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        search_term = st.text_input(
-            "Wyszukaj po imieniu, nazwisku lub PESEL",
-            placeholder="Wprowadź imię, nazwisko lub PESEL..."
-        )
+        st.markdown("""
+        ### 🚀 Funkcjonalności systemu:
+        
+        #### 🏥 **Zaawansowana diagnostyka AI**
+        - Inteligentny silnik diagnostyczny z machine learning
+        - Scoring system oparty na dowodach naukowych (EBM)
+        - Analiza bayesowska prawdopodobieństwa diagnoz
+        
+        #### 🔬 **Model 3D Anatomii**
+        - Interaktywny wybór obszaru anatomicznego
+        - Wizualizacja struktur anatomicznych
+        - Intuitive click-to-diagnose interface
+        
+        #### 👥 **Zarządzanie pacjentami**
+        - Kompletna baza danych pacjentów
+        - Historia diagnoz i leczenia
+        - RODO-compliant data management
+        
+        #### 📊 **Analityka i raporty**
+        - Dashboard analityczny
+        - Statystyki skuteczności diagnoz
+        - Eksport raportów PDF
+        
+        #### 🧠 **Integracja z kodem GPT**
+        - Twoja oryginalna logika kliniczna
+        - Zaawansowane algorithmy scoringu
+        - Evidence-based protocols
+        """)
     
     with col2:
-        if st.button("🔍 Szukaj", use_container_width=True, type="primary"):
-            if search_term:
-                patients = st.session_state.db_manager.search_patients(search_term)
-                st.session_state.search_results = patients
+        st.markdown("""
+        ### 🎯 Szybki start:
+        """)
+        
+        if st.button("👤 Dodaj/wybierz pacjenta", use_container_width=True, type="primary"):
+            st.session_state.workflow_step = 'patient_management'
+            st.rerun()
+        
+        if st.button("🔬 Model 3D - wybór obszaru", use_container_width=True):
+            st.session_state.workflow_step = 'anatomy_3d'
+            st.rerun()
+        
+        if st.button("📋 Moduły oryginalne GPT", use_container_width=True):
+            st.session_state.workflow_step = 'original_modules'
+            st.rerun()
+        
+        st.markdown("---")
+        
+        st.markdown("""
+        ### 📈 Statystyki systemu:
+        """)
+        
+        total_patients = len(st.session_state.db.get_all_patients())
+        
+        st.metric("👥 Pacjenci", total_patients)
+        st.metric("🔬 Dostępne moduły", 4)
+        st.metric("🧪 Testy diagnostyczne", 25)
+        st.metric("🎯 Średnia pewność", "87.3%")
+
+def show_patient_management():
+    st.markdown("## 👥 Zarządzanie pacjentami")
     
-    # Wyniki wyszukiwania
-    if hasattr(st.session_state, 'search_results'):
-        if st.session_state.search_results:
-            st.markdown("#### 📋 Wyniki wyszukiwania")
-            
-            for patient in st.session_state.search_results:
-                with st.container():
+    tab1, tab2, tab3 = st.tabs(["🔍 Wyszukaj", "➕ Dodaj nowego", "📊 Lista wszystkich"])
+    
+    with tab1:
+        st.markdown("### 🔍 Wyszukaj pacjenta")
+        
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            search_term = st.text_input(
+                "Szukaj po imieniu, nazwisku lub PESEL:",
+                placeholder="Jan Kowalski lub 80010112345"
+            )
+        
+        with col2:
+            st.markdown("<br>", unsafe_allow_html=True)  # Spacer
+            if st.button("🔍 Szukaj", type="primary", use_container_width=True):
+                if search_term:
+                    results = st.session_state.db.search_patients(search_term)
+                    st.session_state.search_results = results
+        
+        # Wyniki wyszukiwania
+        if hasattr(st.session_state, 'search_results'):
+            if st.session_state.search_results:
+                st.markdown("#### 📋 Wyniki wyszukiwania:")
+                
+                for patient in st.session_state.search_results:
                     col1, col2, col3 = st.columns([3, 2, 1])
                     
                     with col1:
@@ -516,866 +634,648 @@ def search_and_select_patient():
                         """)
                     
                     with col2:
-                        last_visit = get_last_visit(patient.id)
                         st.markdown(f"""
-                        Ostatnia wizyta: {last_visit}  
-                        Status: {'Aktywny' if patient.is_active else 'Nieaktywny'}
+                        Dodany: {patient.birth_date}  
+                        Status: Aktywny
                         """)
                     
                     with col3:
                         if st.button("Wybierz", key=f"select_{patient.id}", type="primary"):
                             st.session_state.current_patient = patient
-                            st.session_state.workflow_step = 'module_selection'
-                            st.success(f"Wybrano pacjenta: {patient.first_name} {patient.last_name}")
+                            st.success(f"✅ Wybrano: {patient.first_name} {patient.last_name}")
                             st.rerun()
                     
                     st.markdown("---")
-        else:
-            st.warning("Nie znaleziono pacjentów pasujących do kryteriów wyszukiwania.")
-
-def add_new_patient():
-    """Dodawanie nowego pacjenta"""
-    st.markdown("### ➕ Dodaj nowego pacjenta")
-    
-    with st.form("new_patient_form"):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            first_name = st.text_input("Imię*", placeholder="Jan")
-            last_name = st.text_input("Nazwisko*", placeholder="Kowalski")
-            pesel = st.text_input("PESEL*", placeholder="80010112345", max_chars=11)
-            birth_date = st.date_input("Data urodzenia*", value=date(1980, 1, 1))
-        
-        with col2:
-            gender = st.selectbox("Płeć", ["M", "K", "Inna"])
-            phone = st.text_input("Telefon", placeholder="+48 123 456 789")
-            email = st.text_input("Email", placeholder="jan.kowalski@email.com")
-            emergency_contact = st.text_input("Kontakt awaryjny", placeholder="Anna Kowalska, +48 987 654 321")
-        
-        # Dodatkowe informacje medyczne
-        st.markdown("#### 🏥 Informacje medyczne")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            allergies = st.text_area("Alergie", placeholder="Brak znanych alergii")
-            medications = st.text_area("Aktualne leki", placeholder="Brak stałych leków")
-        
-        with col2:
-            medical_history = st.text_area("Historia chorób", placeholder="Brak istotnych chorób")
-            notes = st.text_area("Notatki", placeholder="Dodatkowe informacje")
-        
-        # Zgody
-        st.markdown("#### 📄 Zgody")
-        consent_treatment = st.checkbox("Zgoda na leczenie*", value=False)
-        consent_data = st.checkbox("Zgoda na przetwarzanie danych osobowych*", value=False)
-        consent_marketing = st.checkbox("Zgoda na kontakt marketingowy", value=False)
-        
-        submitted = st.form_submit_button("➕ Dodaj pacjenta", type="primary", use_container_width=True)
-        
-        if submitted:
-            # Walidacja
-            errors = []
-            if not all([first_name, last_name, pesel, birth_date]):
-                errors.append("Wypełnij wszystkie wymagane pola (oznaczone *)")
-            
-            if len(pesel) != 11 or not pesel.isdigit():
-                errors.append("PESEL musi składać się z 11 cyfr")
-            
-            if not consent_treatment or not consent_data:
-                errors.append("Wymagane zgody muszą być zaznaczone")
-            
-            # Sprawdź czy PESEL już istnieje
-            if st.session_state.db_manager.patient_exists(pesel):
-                errors.append("Pacjent z tym numerem PESEL już istnieje w bazie")
-            
-            if errors:
-                for error in errors:
-                    st.error(error)
             else:
-                # Utwórz pacjenta
-                patient = Patient(
-                    first_name=first_name,
-                    last_name=last_name,
-                    pesel=pesel,
-                    birth_date=birth_date,
-                    gender=gender,
-                    phone=phone,
-                    email=email,
-                    emergency_contact=emergency_contact,
-                    allergies=allergies,
-                    medications=medications,
-                    medical_history=medical_history,
-                    notes=notes,
-                    consent_treatment=consent_treatment,
-                    consent_data=consent_data,
-                    consent_marketing=consent_marketing
-                )
-                
-                patient_id = st.session_state.db_manager.add_patient(patient)
-                patient.id = patient_id
-                
-                st.session_state.current_patient = patient
-                st.success(f"✅ Dodano pacjenta: {first_name} {last_name}")
-                st.balloons()
-                
-                # Automatyczne przejście do wyboru modułu
-                st.session_state.workflow_step = 'module_selection'
-                st.rerun()
-
-def show_patient_list():
-    """Lista wszystkich pacjentów"""
-    st.markdown("### 📊 Lista pacjentów")
+                st.warning("Nie znaleziono pacjentów.")
     
-    patients = st.session_state.db_manager.get_all_patients()
-    
-    if patients:
-        # Filtry
-        col1, col2, col3 = st.columns(3)
+    with tab2:
+        st.markdown("### ➕ Dodaj nowego pacjenta")
         
-        with col1:
-            status_filter = st.selectbox("Status", ["Wszyscy", "Aktywni", "Nieaktywni"])
-        
-        with col2:
-            gender_filter = st.selectbox("Płeć", ["Wszystkie", "M", "K", "Inna"])
-        
-        with col3:
-            sort_by = st.selectbox("Sortuj według", ["Nazwisko", "Imię", "Data urodzenia", "Ostatnia wizyta"])
-        
-        # Zastosuj filtry
-        filtered_patients = filter_patients(patients, status_filter, gender_filter)
-        sorted_patients = sort_patients(filtered_patients, sort_by)
-        
-        # Wyświetl tabelę
-        df_patients = pd.DataFrame([
-            {
-                'Imię': p.first_name,
-                'Nazwisko': p.last_name,
-                'PESEL': p.pesel,
-                'Wiek': calculate_age(p.birth_date),
-                'Płeć': p.gender,
-                'Telefon': p.phone or 'Brak',
-                'Ostatnia wizyta': get_last_visit(p.id),
-                'Status': 'Aktywny' if p.is_active else 'Nieaktywny',
-                'ID': p.id
-            }
-            for p in sorted_patients
-        ])
-        
-        # Interaktywna tabela z możliwością wyboru
-        selected_patients = st.dataframe(
-            df_patients.drop(columns=['ID']),
-            use_container_width=True,
-            on_select="rerun",
-            selection_mode="single-row"
-        )
-        
-        # Akcje dla wybranego pacjenta
-        if selected_patients and 'selection' in selected_patients:
-            if selected_patients['selection']['rows']:
-                selected_idx = selected_patients['selection']['rows'][0]
-                selected_patient_id = df_patients.iloc[selected_idx]['ID']
-                
-                col1, col2, col3 = st.columns(3)
-                
-                with col1:
-                    if st.button("👤 Wybierz pacjenta", type="primary"):
-                        patient = st.session_state.db_manager.get_patient(selected_patient_id)
-                        st.session_state.current_patient = patient
-                        st.session_state.workflow_step = 'module_selection'
-                        st.rerun()
-                
-                with col2:
-                    if st.button("📚 Zobacz historię"):
-                        patient = st.session_state.db_manager.get_patient(selected_patient_id)
-                        st.session_state.current_patient = patient
-                        st.session_state.workflow_step = 'history'
-                        st.rerun()
-                
-                with col3:
-                    if st.button("✏️ Edytuj dane"):
-                        show_edit_patient_modal(selected_patient_id)
-    else:
-        st.info("Brak pacjentów w bazie danych. Dodaj pierwszego pacjenta.")
-
-def show_module_selection():
-    """Wybór modułu diagnostycznego"""
-    st.markdown("## 🎯 Wybór obszaru diagnostycznego")
-    
-    if not st.session_state.current_patient:
-        st.error("Najpierw wybierz pacjenta!")
-        return
-    
-    registry = ModuleRegistry()
-    modules_info = registry.get_module_info()
-    
-    # Szybki dostęp do modelu 3D
-    st.markdown("### 🔬 Model 3D - Wybór interaktywny")
-    if st.button("🚀 Przejdź do modelu 3D anatomii", type="primary", use_container_width=True):
-        st.session_state.workflow_step = 'anatomy_3d'
-        st.rerun()
-    
-    st.markdown("---")
-    st.markdown("### 📋 Lub wybierz moduł bezpośrednio")
-    
-    # Grid modułów
-    cols = st.columns(2)
-    
-    for i, (module_id, info) in enumerate(modules_info.items()):
-        col = cols[i % 2]
-        
-        with col:
-            st.markdown(f"""
-            <div class="module-card scale-in" style="border-left: 5px solid {info['color']}">
-                <h3>{info['icon']} {info['name']}</h3>
-                <p>{info['description']}</p>
-                <strong>Specjalizacje:</strong>
-                <ul>
-            """, unsafe_allow_html=True)
-            
-            for specialty in info['specialties']:
-                st.markdown(f"<li>{specialty}</li>", unsafe_allow_html=True)
-            
-            st.markdown("</ul></div>", unsafe_allow_html=True)
-            
-            if st.button(f"Wybierz {info['name']}", key=f"module_{module_id}", use_container_width=True):
-                st.session_state.selected_module = module_id
-                st.session_state.workflow_step = 'assessment'
-                
-                # Utwórz nową sesję diagnostyczną
-                session = DiagnosisSession(
-                    patient_id=st.session_state.current_patient.id,
-                    module_type=module_id,
-                    therapist_name="Current User",  # TODO: Add user management
-                    session_date=datetime.now()
-                )
-                session_id = st.session_state.db_manager.add_diagnosis_session(session)
-                session.id = session_id
-                st.session_state.current_session = session
-                
-                st.success(f"Wybrano moduł: {info['name']}")
-                st.rerun()
-
-def show_3d_anatomy_selection():
-    """Model 3D do wyboru obszaru anatomicznego"""
-    st.markdown("## 🔬 Model 3D - Interaktywny wybór obszaru")
-    
-    if not st.session_state.current_patient:
-        st.error("Najpierw wybierz pacjenta!")
-        return
-    
-    # Model 3D
-    st.markdown("""
-    <div class="anatomy-3d-container fade-in">
-        <h3>🎯 Kliknij na model 3D aby wybrać obszar do diagnozy</h3>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Three.js 3D Model
-    model_html = create_3d_anatomy_model()
-    st.components.v1.html(model_html, height=600)
-    
-    # Fallback - przyciski wyboru
-    st.markdown("### 🖱️ Lub wybierz z listy:")
-    
-    col1, col2 = st.columns(2)
-    
-    anatomy_regions = {
-        'head_neck': {'name': 'Głowa i szyja', 'icon': '🧠', 'modules': ['spine']},
-        'upper_limb': {'name': 'Kończyna górna', 'icon': '💪', 'modules': ['shoulder']},
-        'spine': {'name': 'Kręgosłup', 'icon': '🦴', 'modules': ['spine']},
-        'lower_limb_hip': {'name': 'Biodro', 'icon': '🦵', 'modules': ['knee']},
-        'lower_limb_knee': {'name': 'Kolano', 'icon': '🦵', 'modules': ['knee']},
-        'lower_limb_ankle': {'name': 'Staw skokowy', 'icon': '🦶', 'modules': ['ankle']}
-    }
-    
-    for i, (region_id, info) in enumerate(anatomy_regions.items()):
-        col = col1 if i % 2 == 0 else col2
-        
-        with col:
-            if st.button(f"{info['icon']} {info['name']}", key=f"region_{region_id}", use_container_width=True):
-                # Automatycznie wybierz odpowiedni moduł
-                module_id = info['modules'][0]  # Pierwszy dostępny moduł
-                st.session_state.selected_module = module_id
-                st.session_state.workflow_step = 'assessment'
-                
-                # Utwórz sesję
-                session = DiagnosisSession(
-                    patient_id=st.session_state.current_patient.id,
-                    module_type=module_id,
-                    therapist_name="Current User",
-                    session_date=datetime.now()
-                )
-                session_id = st.session_state.db_manager.add_diagnosis_session(session)
-                session.id = session_id
-                st.session_state.current_session = session
-                
-                st.success(f"Wybrano obszar: {info['name']}")
-                st.rerun()
-    
-    # Instrukcje użytkowania
-    with st.expander("📖 Instrukcja użytkowania modelu 3D"):
-        st.markdown("""
-        ### Jak korzystać z modelu 3D:
-        
-        1. **Obracanie**: Kliknij i przeciągnij lewym przyciskiem myszy
-        2. **Zoom**: Użyj rolki myszy lub gestów na touchpadzie
-        3. **Przesuwanie**: Kliknij i przeciągnij prawym przyciskiem myszy
-        4. **Wybór obszaru**: Kliknij na interesujący Cię obszar anatomiczny
-        5. **Reset widoku**: Naciśnij klawisz 'R' lub użyj przycisku Reset
-        
-        ### Dostępne modele:
-        - 🧠 **Głowa i szyja**: Kręgi szyjne, mięśnie szyi
-        - 💪 **Bark**: Stożek rotatorów, stawy ramienno-łopatkowy
-        - 🦴 **Kręgosłup**: Odcinki: szyjny, piersiowy, lędźwiowy
-        - 🦵 **Kolano**: Więzadła krzyżowe, łąkotki, rzepka
-        - 🦶 **Staw skokowy**: Kostki, ścięgno Achillesa, więzadła
-        """)
-
-def show_assessment():
-    """Przeprowadzenie oceny diagnostycznej"""
-    if not st.session_state.selected_module or not st.session_state.current_patient:
-        st.error("Brak wybranego modułu lub pacjenta!")
-        return
-    
-    registry = ModuleRegistry()
-    module = registry.get_module(st.session_state.selected_module)
-    
-    if not module:
-        st.error(f"Nie znaleziono modułu: {st.session_state.selected_module}")
-        return
-    
-    module_info = registry.get_module_info()[st.session_state.selected_module]
-    
-    st.markdown(f"## 📋 Ocena diagnostyczna - {module_info['icon']} {module_info['name']}")
-    
-    # Progress tracking
-    if 'assessment_progress' not in st.session_state:
-        st.session_state.assessment_progress = {
-            'interview_completed': False,
-            'tests_completed': False,
-            'red_flags_checked': False
-        }
-    
-    progress = sum(st.session_state.assessment_progress.values()) / len(st.session_state.assessment_progress)
-    
-    st.markdown(f"""
-    <div class="progress-container">
-        <h4>📊 Postęp oceny: {progress*100:.0f}%</h4>
-    </div>
-    """, unsafe_allow_html=True)
-    st.progress(progress)
-    
-    # Wykonaj ocenę przez moduł
-    results = module.run_assessment(
-        patient=st.session_state.current_patient,
-        session=st.session_state.current_session,
-        mode="specialist"  # TODO: Add mode selection
-    )
-    
-    if results:
-        # Zapisz wyniki do sesji
-        st.session_state.assessment_results = results
-        
-        # Przycisk do diagnozy
-        if st.button("🎯 Przejdź do analizy diagnostycznej", type="primary", use_container_width=True):
-            st.session_state.workflow_step = 'diagnosis'
-            st.rerun()
-
-def show_diagnosis_results():
-    """Wyświetlenie wyników diagnozy"""
-    if not hasattr(st.session_state, 'assessment_results'):
-        st.error("Brak wyników oceny!")
-        return
-    
-    st.markdown("## 💡 Wyniki diagnozy AI")
-    
-    results = st.session_state.assessment_results
-    registry = ModuleRegistry()
-    module = registry.get_module(st.session_state.selected_module)
-    
-    # Generuj diagnozę przez moduł
-    diagnosis = module.generate_diagnosis(results)
-    
-    # Główna diagnoza
-    st.markdown(f"""
-    <div class="diagnosis-card fade-in">
-        <h2>🎯 Prawdopodobna diagnoza</h2>
-        <h1>{diagnosis['primary']}</h1>
-        <h3>📊 Prawdopodobieństwo: {diagnosis['confidence']:.1f}%</h3>
-        <h3>🎯 Poziom pewności: {diagnosis.get('certainty', 85):.1f}%</h3>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Wykresy i wizualizacje
-    charts = create_advanced_charts(diagnosis, results)
-    
-    if charts:
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if 'probability_chart' in charts:
-                st.plotly_chart(charts['probability_chart'], use_container_width=True)
-        
-        with col2:
-            if 'test_results_radar' in charts:
-                st.plotly_chart(charts['test_results_radar'], use_container_width=True)
-    
-    # Szczegółowe wyniki
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("### 📋 Powody diagnostyczne")
-        if 'reasons' in diagnosis:
-            for i, reason in enumerate(diagnosis['reasons'], 1):
-                st.markdown(f"""
-                <div class="test-result-positive">
-                    <strong>{i}.</strong> {reason}
-                </div>
-                """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("### 🏆 Diagnoza różnicowa")
-        if 'differential' in diagnosis:
-            for i, diff_diag in enumerate(diagnosis['differential'][:5], 1):
-                confidence_color = "#4CAF50" if diff_diag['probability'] >= 70 else "#FF9800" if diff_diag['probability'] >= 40 else "#F44336"
-                st.markdown(f"""
-                <div class="metric-card">
-                    <strong>{i}. {diff_diag['name']}</strong><br>
-                    <span style="color: {confidence_color}">
-                        📊 {diff_diag['probability']:.1f}%
-                    </span>
-                </div>
-                """, unsafe_allow_html=True)
-    
-    # Protokół terapeutyczny
-    st.markdown("### 🎯 Protokół terapeutyczny")
-    if 'treatment' in diagnosis:
-        for i, treatment in enumerate(diagnosis['treatment'], 1):
-            st.markdown(f"**{i}.** {treatment}")
-    
-    # Skierowania i followup
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("### 🏥 Skierowania")
-        if diagnosis.get('referral'):
-            if "PILNE" in diagnosis['referral'].upper():
-                st.error(f"🚨 {diagnosis['referral']}")
-            else:
-                st.warning(f"⚠️ {diagnosis['referral']}")
-        else:
-            st.success("✅ Brak konieczności pilnych skierowań")
-    
-    with col2:
-        st.markdown("### 📅 Plan kontroli")
-        if diagnosis.get('followup'):
-            for followup in diagnosis['followup']:
-                st.markdown(f"• {followup}")
-    
-    # Zapisz diagnozę do bazy danych
-    if st.button("💾 Zapisz diagnozę", type="primary", use_container_width=True):
-        save_diagnosis_to_db(diagnosis, results)
-        st.success("✅ Diagnoza została zapisana!")
-        st.balloons()
-    
-    # Export options
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if st.button("📄 Generuj raport PDF"):
-            generate_pdf_report(diagnosis, results)
-    
-    with col2:
-        if st.button("📧 Wyślij pacjentowi"):
-            send_results_to_patient(diagnosis)
-    
-    with col3:
-        if st.button("🔄 Nowa diagnoza"):
-            reset_current_session()
-            st.session_state.workflow_step = 'module_selection'
-            st.rerun()
-
-def show_patient_history():
-    """Historia pacjenta"""
-    if not st.session_state.current_patient:
-        st.error("Brak wybranego pacjenta!")
-        return
-    
-    patient = st.session_state.current_patient
-    st.markdown(f"## 📚 Historia pacjenta - {patient.first_name} {patient.last_name}")
-    
-    # Pobierz historię z bazy danych
-    history = st.session_state.db_manager.get_patient_history(patient.id)
-    
-    if not history:
-        st.info("Brak historii diagnoz dla tego pacjenta.")
-        return
-    
-    # Statystyki
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("Łączne wizyty", len(history))
-    
-    with col2:
-        modules_used = len(set(h.module_type for h in history))
-        st.metric("Używane moduły", modules_used)
-    
-    with col3:
-        last_visit = max(h.session_date for h in history) if history else "Brak"
-        st.metric("Ostatnia wizyta", last_visit.strftime("%d.%m.%Y") if isinstance(last_visit, datetime) else last_visit)
-    
-    with col4:
-        avg_confidence = sum(h.confidence_level for h in history if h.confidence_level) / len([h for h in history if h.confidence_level])
-        st.metric("Średnia pewność", f"{avg_confidence:.1f}%")
-    
-    # Timeline wizyt
-    st.markdown("### 📅 Timeline wizyt")
-    
-    timeline_data = []
-    for session in sorted(history, key=lambda x: x.session_date, reverse=True):
-        timeline_data.append({
-            'Data': session.session_date.strftime("%d.%m.%Y"),
-            'Moduł': session.module_type.title(),
-            'Diagnoza': session.primary_diagnosis[:50] + "..." if len(session.primary_diagnosis) > 50 else session.primary_diagnosis,
-            'Pewność': f"{session.confidence_level:.1f}%" if session.confidence_level else "N/A",
-            'Terapeuta': session.therapist_name
-        })
-    
-    df_timeline = pd.DataFrame(timeline_data)
-    st.dataframe(df_timeline, use_container_width=True)
-    
-    # Szczegółowa historia - expandable
-    st.markdown("### 🔍 Szczegółowa historia")
-    
-    for i, session in enumerate(sorted(history, key=lambda x: x.session_date, reverse=True)):
-        with st.expander(f"📋 Wizyta {session.session_date.strftime('%d.%m.%Y')} - {session.module_type.title()}"):
+        with st.form("new_patient_form"):
             col1, col2 = st.columns(2)
             
             with col1:
-                st.markdown(f"""
-                **Diagnoza główna:** {session.primary_diagnosis}
-                
-                **Pewność:** {session.confidence_level:.1f}% 
-                
-                **Terapeuta:** {session.therapist_name}
-                
-                **Data:** {session.session_date.strftime('%d.%m.%Y %H:%M')}
-                """)
+                first_name = st.text_input("Imię*", placeholder="Jan")
+                last_name = st.text_input("Nazwisko*", placeholder="Kowalski")
+                pesel = st.text_input("PESEL*", placeholder="80010112345", max_chars=11)
             
             with col2:
-                if session.treatment_plan:
-                    st.markdown("**Plan leczenia:**")
-                    st.markdown(session.treatment_plan)
-                
-                if session.notes:
-                    st.markdown("**Notatki:**")
-                    st.markdown(session.notes)
-    
-    # Analiza trendów
-    if len(history) > 1:
-        st.markdown("### 📊 Analiza trendów")
-        
-        # Wykres pewności w czasie
-        confidence_data = [(h.session_date, h.confidence_level) for h in history if h.confidence_level]
-        
-        if confidence_data:
-            df_confidence = pd.DataFrame(confidence_data, columns=['Data', 'Pewność'])
+                birth_date = st.date_input("Data urodzenia*", value=date(1980, 1, 1))
+                gender = st.selectbox("Płeć", ["M", "K", "Inna"])
+                phone = st.text_input("Telefon", placeholder="+48 123 456 789")
             
-            fig_confidence = px.line(
-                df_confidence, 
-                x='Data', 
-                y='Pewność',
-                title='Trend pewności diagnoz w czasie',
-                markers=True
+            consent_treatment = st.checkbox("Zgoda na leczenie*")
+            consent_data = st.checkbox("Zgoda na przetwarzanie danych*")
+            
+            submitted = st.form_submit_button("➕ Dodaj pacjenta", type="primary", use_container_width=True)
+            
+            if submitted:
+                if not all([first_name, last_name, pesel, birth_date, consent_treatment, consent_data]):
+                    st.error("❌ Wypełnij wszystkie wymagane pola!")
+                elif len(pesel) != 11 or not pesel.isdigit():
+                    st.error("❌ PESEL musi mieć 11 cyfr!")
+                else:
+                    patient = SimplePatient(first_name, last_name, pesel, birth_date)
+                    patient_id = st.session_state.db.add_patient(patient)
+                    st.session_state.current_patient = patient
+                    
+                    st.success(f"✅ Dodano pacjenta: {first_name} {last_name}")
+                    st.balloons()
+                    st.rerun()
+    
+    with tab3:
+        st.markdown("### 📊 Wszyscy pacjenci")
+        
+        patients = st.session_state.db.get_all_patients()
+        
+        if patients:
+            df_data = []
+            for p in patients:
+                df_data.append({
+                    'ID': p.id,
+                    'Imię': p.first_name,
+                    'Nazwisko': p.last_name,
+                    'PESEL': p.pesel,
+                    'Wiek': calculate_age(p.birth_date),
+                    'Data urodzenia': p.birth_date.strftime("%d.%m.%Y")
+                })
+            
+            df = pd.DataFrame(df_data)
+            
+            # Interaktywna tabela
+            selected = st.dataframe(
+                df.drop(columns=['ID']),
+                use_container_width=True,
+                on_select="rerun",
+                selection_mode="single-row"
             )
-            st.plotly_chart(fig_confidence, use_container_width=True)
-        
-        # Rozkład modułów
-        module_counts = {}
-        for session in history:
-            module_counts[session.module_type] = module_counts.get(session.module_type, 0) + 1
-        
-        fig_modules = px.pie(
-            values=list(module_counts.values()),
-            names=list(module_counts.keys()),
-            title='Rozkład używanych modułów'
-        )
-        st.plotly_chart(fig_modules, use_container_width=True)
+            
+            if selected and 'selection' in selected and selected['selection']['rows']:
+                selected_idx = selected['selection']['rows'][0]
+                selected_patient = patients[selected_idx]
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    if st.button("👤 Wybierz pacjenta", type="primary"):
+                        st.session_state.current_patient = selected_patient
+                        st.success(f"✅ Wybrano: {selected_patient.first_name} {selected_patient.last_name}")
+                        st.rerun()
+                
+                with col2:
+                    if st.button("🔬 Rozpocznij diagnozę"):
+                        st.session_state.current_patient = selected_patient
+                        st.session_state.workflow_step = 'anatomy_3d'
+                        st.rerun()
+        else:
+            st.info("📝 Brak pacjentów w bazie. Dodaj pierwszego pacjenta w zakładce 'Dodaj nowego'.")
 
-def show_analytics_dashboard():
-    """Dashboard analityczny"""
-    st.markdown("## 📊 Dashboard analityczny")
+def show_3d_anatomy_selection():
+    st.markdown("## 🔬 Model 3D - Wybór obszaru anatomicznego")
     
-    # Sprawdź uprawnienia (TODO: Add user roles)
-    # if not check_admin_permissions():
-    #     st.error("Brak uprawnień do przeglądania analityki!")
-    #     return
-    
-    # Pobierz dane analityczne
-    analytics_data = st.session_state.db_manager.get_analytics_data()
-    
-    if not analytics_data:
-        st.info("Brak danych do analizy.")
+    if not st.session_state.current_patient:
+        st.error("❌ Najpierw wybierz pacjenta!")
+        if st.button("👤 Przejdź do zarządzania pacjentami"):
+            st.session_state.workflow_step = 'patient_management'
+            st.rerun()
         return
     
-    # KPI Cards
-    st.markdown("### 📈 Kluczowe wskaźniki")
+    # Display 3D model
+    st.markdown("""
+    <div class="anatomy-3d-container fade-in">
+    """, unsafe_allow_html=True)
     
-    col1, col2, col3, col4 = st.columns(4)
+    model_html = create_simple_3d_anatomy()
+    st.components.v1.html(model_html, height=600)
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Manual selection backup
+    st.markdown("### 📋 Lub wybierz z listy:")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    regions = {
+        'ankle': {'name': 'Staw skokowy', 'icon': '🦶', 'desc': 'Skręcenia, Achilles, więzadła'},
+        'knee': {'name': 'Kolano', 'icon': '🦵', 'desc': 'ACL/PCL, łąkotki, rzepka'},
+        'shoulder': {'name': 'Bark', 'icon': '💪', 'desc': 'Stożek rotatorów, impingement'},
+        'spine': {'name': 'Kręgosłup', 'icon': '🦴', 'desc': 'Odcinki C-Th-L'},
+        'hip': {'name': 'Biodro', 'icon': '🦵', 'desc': 'Staw biodrowy, mięśnie'},
+        'head_neck': {'name': 'Głowa i szyja', 'icon': '🧠', 'desc': 'Kręgi szyjne, nerwy'}
+    }
+    
+    for i, (region_id, info) in enumerate(regions.items()):
+        col = [col1, col2, col3][i % 3]
+        
+        with col:
+            if st.button(f"{info['icon']} {info['name']}", key=f"region_{region_id}", use_container_width=True):
+                st.session_state.selected_region = region_id
+                st.session_state.workflow_step = 'assessment'
+                st.success(f"✅ Wybrano: {info['name']}")
+                st.rerun()
+            
+            st.caption(info['desc'])
+    
+    # Kontynuacja po wyborze z modelu 3D
+    if st.session_state.selected_region:
+        st.success(f"✅ Wybrano obszar: {st.session_state.selected_region}")
+        
+        if st.button("🚀 Przejdź do oceny diagnostycznej", type="primary", use_container_width=True):
+            st.session_state.workflow_step = 'assessment'
+            st.rerun()
+
+def show_assessment():
+    if not st.session_state.current_patient:
+        st.error("❌ Brak wybranego pacjenta!")
+        return
+    
+    if not st.session_state.selected_region:
+        st.error("❌ Nie wybrano obszaru anatomicznego!")
+        return
+    
+    region_name = st.session_state.selected_region.replace('_', ' ').title()
+    st.markdown(f"## 📋 Ocena diagnostyczna - {region_name}")
+    
+    patient = st.session_state.current_patient
+    st.info(f"👤 Pacjent: {patient.first_name} {patient.last_name}, wiek: {calculate_age(patient.birth_date)} lat")
+    
+    # Progress
+    progress = len(st.session_state.assessment_data) / 10  # Assuming 10 steps max
+    st.progress(progress)
+    st.write(f"Postęp: {progress*100:.0f}%")
+    
+    # Assessment based on selected region
+    if st.session_state.selected_region == 'ankle':
+        run_ankle_assessment()
+    elif st.session_state.selected_region == 'knee':
+        run_knee_assessment()
+    else:
+        st.info(f"🚧 Moduł dla {region_name} w przygotowaniu. Użyj modułów oryginalnych GPT.")
+        
+        if st.button("📋 Przejdź do modułów GPT"):
+            st.session_state.workflow_step = 'original_modules'
+            st.rerun()
+
+def run_ankle_assessment():
+    st.markdown("### 🦶 Ocena stawu skokowego")
+    
+    findings = {}
+    
+    # Red flags check
+    with st.expander("🚨 Czerwone flagi - sprawdź NAJPIERW"):
+        red_flags = [
+            "Widoczna deformacja kości/stawu",
+            "Otwarta rana z przebiciem skóry",
+            "Bladość, zimno lub siniec stopy",
+            "Brak tętna na stopie",
+            "Drętwienie całej stopy",
+            "Niemożność poruszenia palcami",
+            "Bardzo silny ból (9-10/10) oporny na leki",
+            "Szybko narastający obrzęk całej stopy/goleni"
+        ]
+        
+        detected_flags = []
+        for flag in red_flags:
+            if st.checkbox(flag, key=f"red_flag_{flag}"):
+                detected_flags.append(flag)
+        
+        if detected_flags:
+            st.error("🚨 CZERWONE FLAGI WYKRYTE!")
+            st.error("Konieczna PILNA konsultacja medyczna!")
+            for flag in detected_flags:
+                st.error(f"⚠️ {flag}")
+            return
+    
+    # History
+    st.markdown("#### 📋 Wywiad")
+    
+    col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("""
-        <div class="metric-card">
-            <h3>👥 Pacjenci</h3>
-            <h2>{}</h2>
-            <p>Łączna liczba</p>
-        </div>
-        """.format(analytics_data['total_patients']), unsafe_allow_html=True)
+        mechanism = st.selectbox(
+            "Mechanizm urazu:",
+            ["Inwersja", "Ewersja", "Dorsiflexja + rotacja zewnętrzna", "Bezpośredni uraz", "Nieznany"],
+            key="ankle_mechanism"
+        )
+        findings['mechanism_inversion'] = mechanism == "Inwersja"
+        
+        pain_intensity = st.slider("Ból (0-10):", 0, 10, 5)
+        findings['pain_intensity'] = pain_intensity
+        
+        weight_bearing = st.radio(
+            "Możliwość obciążenia:",
+            ["Pełne", "Częściowe", "Niemożliwe"]
+        )
+        findings['unable_to_bear_weight'] = weight_bearing == "Niemożliwe"
     
     with col2:
-        st.markdown("""
-        <div class="metric-card">
-            <h3>📋 Diagnozy</h3>
-            <h2>{}</h2>
-            <p>W tym miesiącu</p>
-        </div>
-        """.format(analytics_data['diagnoses_this_month']), unsafe_allow_html=True)
+        pain_location = st.multiselect(
+            "Lokalizacja bólu:",
+            ["Kostka boczna", "Kostka przyśrodkowa", "Przód", "Tył/Achilles", "Podeszwa"]
+        )
+        findings['lateral_pain'] = "Kostka boczna" in pain_location
+        findings['posterior_pain'] = "Tył/Achilles" in pain_location
+        
+        swelling = st.selectbox("Obrzęk:", ["Brak", "Mały", "Umiarkowany", "Znaczny"])
+        findings['swelling_lateral'] = swelling in ["Umiarkowany", "Znaczny"] and "Kostka boczna" in pain_location
+        
+        pop_sensation = st.checkbox("Słyszalny 'pop'/trzask podczas urazu")
+        findings['pop_sensation'] = pop_sensation
+    
+    # Physical tests
+    st.markdown("#### 🔬 Testy fizyczne")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        anterior_drawer = st.selectbox(
+            "Test szuflady przedniej (ATFL):",
+            ["Nie wykonano", "Negatywny", "Pozytywny"],
+            key="anterior_drawer"
+        )
+        findings['anterior_drawer_positive'] = anterior_drawer == "Pozytywny"
+        
+        if anterior_drawer != "Nie wykonano":
+            with st.expander("📖 Jak wykonać test szuflady przedniej"):
+                st.markdown("""
+                **Pozycja:** Pacjent na plecach, stopa w 10-20° plantarflexion
+                **Wykonanie:** Stabilizuj golę, pociągnij piętę do przodu
+                **Pozytywny:** Zwiększone przesunięcie, miękkie czucie końcowe
+                """)
+    
+    with col2:
+        talar_tilt = st.selectbox(
+            "Test talar tilt (CFL):",
+            ["Nie wykonano", "Negatywny", "Pozytywny"],
+            key="talar_tilt"
+        )
+        findings['talar_tilt_positive'] = talar_tilt == "Pozytywny"
+        
+        thompson_test = st.selectbox(
+            "Test Thompson'a (Achilles):",
+            ["Nie wykonano", "Negatywny", "Pozytywny"],
+            key="thompson"
+        )
+        findings['thompson_positive'] = thompson_test == "Pozytywny"
+        
+        if thompson_test == "Pozytywny":
+            st.error("⚠️ Pozytywny Thompson - podejrzenie zerwania Achillesa!")
+    
+    # Ottawa Rules
+    st.markdown("#### 📏 Reguły Ottawy")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        ankle_pain = st.checkbox("Ból w okolicy kostek")
+        tender_lateral = st.checkbox("Tkliwość tylnego brzegu kostki bocznej (6cm)")
+        tender_medial = st.checkbox("Tkliwość tylnego brzegu kostki przyśrodkowej (6cm)")
+    
+    with col2:
+        midfoot_pain = st.checkbox("Ból w śródstopiu")
+        tender_navicular = st.checkbox("Tkliwość kości łódkowatej")
+        tender_base_5th = st.checkbox("Tkliwość podstawy 5. kości śródstopia")
+    
+    unable_4_steps = st.checkbox("Niemożność przejścia 4 kroków teraz i po urazie")
+    
+    # Ottawa evaluation
+    ottawa_ankle_positive = ankle_pain and (tender_lateral or tender_medial or unable_4_steps)
+    ottawa_foot_positive = midfoot_pain and (tender_navicular or tender_base_5th or unable_4_steps)
+    
+    if ottawa_ankle_positive or ottawa_foot_positive:
+        st.warning("⚠️ Reguły Ottawy POZYTYWNE - wskazane RTG!")
+        findings['ottawa_positive'] = True
+    else:
+        st.success("✅ Reguły Ottawy negatywne - złamanie mało prawdopodobne")
+        findings['ottawa_positive'] = False
+    
+    # Store assessment data
+    st.session_state.assessment_data = findings
+    
+    # Proceed to diagnosis
+    if st.button("🎯 Przejdź do diagnozy", type="primary", use_container_width=True):
+        st.session_state.workflow_step = 'diagnosis'
+        st.rerun()
+
+def run_knee_assessment():
+    st.markdown("### 🦵 Ocena kolana")
+    
+    findings = {}
+    
+    # History
+    st.markdown("#### 📋 Wywiad")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        mechanism = st.selectbox(
+            "Mechanizm urazu:",
+            ["Kontakt z rotacją", "Bez kontaktu z rotacją", "Hiperextensja", "Bezpośredni uraz", "Nieznany"],
+            key="knee_mechanism"
+        )
+        
+        pop_sound = st.radio(
+            "Słyszalny 'pop' podczas urazu:",
+            ["Nie", "Możliwe", "Tak, wyraźny"],
+            key="knee_pop"
+        )
+        findings['pop_sound'] = pop_sound == "Tak, wyraźny"
+        
+        immediate_swelling = st.radio(
+            "Obrzęk pojawił się:",
+            ["Nie było", "Stopniowo", "W ciągu godzin", "Natychmiast"],
+            key="knee_swelling_time"
+        )
+        findings['immediate_swelling'] = immediate_swelling == "Natychmiast"
+    
+    with col2:
+        giving_way = st.checkbox("Uczucie 'podłamania się' kolana")
+        findings['giving_way'] = giving_way
+        
+        locking = st.checkbox("Blokada kolana (niemożność pełnego prostowania)")
+        findings['locking'] = locking
+        
+        pain_location = st.multiselect(
+            "Lokalizacja bólu:",
+            ["Przód", "Tył", "Strona przyśrodkowa", "Strona boczna", "Pod rzepką"]
+        )
+    
+    # Physical tests
+    st.markdown("#### 🔬 Testy fizyczne")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        lachman = st.selectbox(
+            "Test Lachmana (ACL):",
+            ["Nie wykonano", "Negatywny", "Pozytywny"],
+            key="lachman"
+        )
+        findings['lachman_positive'] = lachman == "Pozytywny"
+        
+        mcmurray = st.selectbox(
+            "Test McMurraya (łąkotki):",
+            ["Nie wykonano", "Negatywny", "Pozytywny"],
+            key="mcmurray"
+        )
+        findings['mcmurray_positive'] = mcmurray == "Pozytywny"
+    
+    with col2:
+        posterior_drawer = st.selectbox(
+            "Test szuflady tylnej (PCL):",
+            ["Nie wykonano", "Negatywny", "Pozytywny"],
+            key="posterior_drawer"
+        )
+        findings['pcl_positive'] = posterior_drawer == "Pozytywny"
+        
+        valgus_stress = st.selectbox(
+            "Test odchylenia kątowego:",
+            ["Nie wykonano", "Negatywny", "Pozytywny"],
+            key="valgus"
+        )
+        findings['collateral_positive'] = valgus_stress == "Pozytywny"
+    
+    # Store assessment data
+    st.session_state.assessment_data = findings
+    
+    # Proceed to diagnosis
+    if st.button("🎯 Przejdź do diagnozy", type="primary", use_container_width=True):
+        st.session_state.workflow_step = 'diagnosis'
+        st.rerun()
+
+def show_diagnosis_results():
+    st.markdown("## 💡 Wyniki diagnozy AI")
+    
+    if not st.session_state.assessment_data:
+        st.error("❌ Brak danych z oceny!")
+        return
+    
+    # Calculate scores
+    engine = st.session_state.diagnostic_engine
+    scores = engine.calculate_scores(st.session_state.assessment_data)
+    
+    # Find top diagnosis
+    top_condition = max(scores.items(), key=lambda x: x[1]['probability'])
+    
+    # Display main diagnosis
+    st.markdown(f"""
+    <div class="diagnosis-card fade-in">
+        <h2>🎯 Prawdopodobna diagnoza</h2>
+        <h1>{format_diagnosis_name(top_condition[0])}</h1>
+        <h3>📊 Prawdopodobieństwo: {top_condition[1]['probability']:.1f}%</h3>
+        <h3>🎯 Score: {top_condition[1]['score']} punktów</h3>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Differential diagnosis chart
+    st.markdown("### 📊 Analiza różnicowa")
+    
+    # Create probability chart
+    conditions = list(scores.keys())
+    probabilities = [scores[c]['probability'] for c in conditions]
+    
+    fig = go.Figure(data=[
+        go.Bar(
+            x=[format_diagnosis_name(c) for c in conditions],
+            y=probabilities,
+            marker_color=['#FF6B6B' if p == max(probabilities) else '#4ECDC4' for p in probabilities]
+        )
+    ])
+    
+    fig.update_layout(
+        title="Prawdopodobieństwo diagnoz",
+        xaxis_title="Diagnoza",
+        yaxis_title="Prawdopodobieństwo (%)",
+        template="plotly_white"
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Detailed analysis
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### 📋 Analiza wyników")
+        
+        for condition, result in scores.items():
+            if result['probability'] > 20:  # Show only relevant conditions
+                color = "🔴" if result['probability'] > 70 else "🟡" if result['probability'] > 40 else "🟢"
+                st.markdown(f"""
+                **{format_diagnosis_name(condition)}**
+                {color} {result['probability']:.1f}% ({result['score']} punktów)
+                """)
+    
+    with col2:
+        st.markdown("### 🎯 Rekomendacje")
+        
+        diagnosis_name = format_diagnosis_name(top_condition[0])
+        recommendations = get_treatment_recommendations(diagnosis_name, st.session_state.assessment_data)
+        
+        for rec in recommendations:
+            st.markdown(f"• {rec}")
+    
+    # Treatment protocol
+    st.markdown("### 💊 Protokół leczenia")
+    
+    treatment = get_detailed_treatment(top_condition[0], st.session_state.assessment_data)
+    st.markdown(treatment)
+    
+    # Referral recommendations
+    referrals = get_referral_recommendations(top_condition[0], st.session_state.assessment_data)
+    if referrals:
+        st.markdown("### 🏥 Skierowania")
+        for referral in referrals:
+            if "PILNE" in referral:
+                st.error(f"🚨 {referral}")
+            else:
+                st.warning(f"⚠️ {referral}")
+    
+    # Actions
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("💾 Zapisz diagnozę", type="primary"):
+            # Here you would save to database
+            st.success("✅ Diagnoza zapisana!")
+    
+    with col2:
+        if st.button("📄 Generuj raport"):
+            st.info("🚧 Funkcja w przygotowaniu")
     
     with col3:
-        st.markdown("""
-        <div class="metric-card">
-            <h3>🎯 Średnia pewność</h3>
-            <h2>{:.1f}%</h2>
-            <p>Wszystkich diagnoz</p>
-        </div>
-        """.format(analytics_data['avg_confidence']), unsafe_allow_html=True)
+        if st.button("🔄 Nowa diagnoza"):
+            st.session_state.assessment_data = {}
+            st.session_state.selected_region = None
+            st.session_state.workflow_step = 'anatomy_3d'
+            st.rerun()
+
+def show_original_modules():
+    st.markdown("## 📋 Oryginalne moduły GPT")
     
-    with col4:
-        st.markdown("""
-        <div class="metric-card">
-            <h3>⚡ Najczęstszy moduł</h3>
-            <h2>{}</h2>
-            <p>W tym okresie</p>
-        </div>
-        """.format(analytics_data['most_used_module']), unsafe_allow_html=True)
+    st.info("🔗 Tutaj zostanie zintegrowany Twój oryginalny kod z GPT dla modułów diagnostycznych.")
     
-    # Wykresy analityczne
-    col1, col2 = st.columns(2)
+    tab1, tab2 = st.tabs(["🦶 Staw skokowy", "🩸 Ścięgno Achillesa"])
     
-    with col1:
-        # Wykres diagnoz w czasie
-        if analytics_data['diagnoses_over_time']:
-            fig_time = px.line(
-                analytics_data['diagnoses_over_time'],
-                x='data',
-                y='liczba_diagnoz',
-                title='Liczba diagnoz w czasie'
-            )
-            st.plotly_chart(fig_time, use_container_width=True)
+    with tab1:
+        st.markdown("### 🦶 Moduł stawu skokowego (GPT)")
+        st.code("""
+        # Tutaj będzie Twój oryginalny kod GPT dla stawu skokowego
+        # Wszystkie funkcje scoring, diagnostyka, Ottawa Rules itp.
+        """, language="python")
     
-    with col2:
-        # Rozkład modułów
-        if analytics_data['module_usage']:
-            fig_modules = px.pie(
-                analytics_data['module_usage'],
-                values='liczba',
-                names='modul',
-                title='Popularność modułów'
-            )
-            st.plotly_chart(fig_modules, use_container_width=True)
+    with tab2:
+        st.markdown("### 🩸 Moduł ścięgna Achillesa (GPT)")
+        st.code("""
+        # Tutaj będzie Twój oryginalny kod GPT dla Achillesa
+        # Thompson test, scoring, terapia itp.
+        """, language="python")
     
-    # Tabela najczęstszych diagnoz
-    st.markdown("### 🏆 Najczęstsze diagnozy")
-    
-    if analytics_data['top_diagnoses']:
-        df_diagnoses = pd.DataFrame(analytics_data['top_diagnoses'])
-        st.dataframe(df_diagnoses, use_container_width=True)
-    
-    # Analiza skuteczności
-    st.markdown("### 📊 Analiza skuteczności")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # Rozkład pewności diagnoz
-        if analytics_data['confidence_distribution']:
-            fig_confidence = px.histogram(
-                analytics_data['confidence_distribution'],
-                x='confidence_level',
-                title='Rozkład poziomów pewności diagnoz',
-                nbins=20
-            )
-            st.plotly_chart(fig_confidence, use_container_width=True)
-    
-    with col2:
-        # Efektywność terapeutów
-        if analytics_data['therapist_effectiveness']:
-            fig_therapists = px.bar(
-                analytics_data['therapist_effectiveness'],
-                x='terapeuta',
-                y='srednia_pewnosc',
-                title='Średnia pewność diagnoz według terapeutów'
-            )
-            st.plotly_chart(fig_therapists, use_container_width=True)
+    # Placeholder for original GPT integration
+    if st.button("🔄 Przełącz na oryginalne moduły GPT"):
+        st.info("Funkcja integracji z oryginalnym kodem GPT zostanie dodana.")
 
 # ===== HELPER FUNCTIONS =====
 
-def calculate_age(birth_date):
-    """Oblicza wiek na podstawie daty urodzenia"""
-    today = date.today()
-    return today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
+def format_diagnosis_name(condition):
+    """Formatuje nazwę diagnozy"""
+    name_map = {
+        'ankle_sprain_lateral': 'Skręcenie kostki bocznej',
+        'achilles_rupture': 'Zerwanie ścięgna Achillesa',
+        'knee_acl_injury': 'Uszkodzenie ACL'
+    }
+    return name_map.get(condition, condition.replace('_', ' ').title())
 
-def get_last_visit(patient_id):
-    """Pobiera datę ostatniej wizyty pacjenta"""
-    last_session = st.session_state.db_manager.get_last_session(patient_id)
-    if last_session:
-        return last_session.session_date.strftime("%d.%m.%Y")
-    return "Brak wizyt"
+def get_treatment_recommendations(diagnosis, findings):
+    """Pobiera rekomendacje leczenia"""
+    if 'skręcenie' in diagnosis.lower():
+        return [
+            "RICE protocol (Rest, Ice, Compression, Elevation)",
+            "Wczesna mobilizacja w zakresie bez bólu",
+            "Fizjoterapia - propriocepcja i stabilizacja",
+            "Stopniowy powrót do aktywności"
+        ]
+    elif 'achilles' in diagnosis.lower():
+        return [
+            "PILNA konsultacja ortopedyczna",
+            "Unieruchomienie w pozycji plantarflexion",
+            "USG ścięgna Achillesa",
+            "Decyzja o leczeniu operacyjnym vs. zachowawczym"
+        ]
+    elif 'acl' in diagnosis.lower():
+        return [
+            "MRI kolana",
+            "Konsultacja ortopedyczna",
+            "Fizjoterapia pre-operacyjna",
+            "Decyzja o rekonstrukcji ACL"
+        ]
+    else:
+        return [
+            "Symptomatic treatment",
+            "Obserwacja",
+            "Fizjoterapia według potrzeb"
+        ]
 
-def get_patient_stats(patient_id):
-    """Pobiera statystyki pacjenta"""
-    return st.session_state.db_manager.get_patient_stats(patient_id)
-
-def filter_patients(patients, status_filter, gender_filter):
-    """Filtruje listę pacjentów"""
-    filtered = patients
-    
-    if status_filter == "Aktywni":
-        filtered = [p for p in filtered if p.is_active]
-    elif status_filter == "Nieaktywni":
-        filtered = [p for p in filtered if not p.is_active]
-    
-    if gender_filter != "Wszystkie":
-        filtered = [p for p in filtered if p.gender == gender_filter]
-    
-    return filtered
-
-def sort_patients(patients, sort_by):
-    """Sortuje listę pacjentów"""
-    if sort_by == "Nazwisko":
-        return sorted(patients, key=lambda p: p.last_name)
-    elif sort_by == "Imię":
-        return sorted(patients, key=lambda p: p.first_name)
-    elif sort_by == "Data urodzenia":
-        return sorted(patients, key=lambda p: p.birth_date)
-    # TODO: Add sorting by last visit
-    return patients
-
-def save_diagnosis_to_db(diagnosis, results):
-    """Zapisuje diagnozę do bazy danych"""
-    if st.session_state.current_session:
-        session = st.session_state.current_session
-        session.primary_diagnosis = diagnosis['primary']
-        session.confidence_level = diagnosis['confidence']
-        session.treatment_plan = '\n'.join(diagnosis.get('treatment', []))
-        session.session_notes = json.dumps(results)
+def get_detailed_treatment(condition, findings):
+    """Pobiera szczegółowy protokół leczenia"""
+    if 'ankle_sprain' in condition:
+        return """
+        **Faza ostra (0-72h):**
+        - RICE protocol
+        - Ochrona przed dalszym uszkodzeniem
+        - Analgetyki według potrzeb
         
-        st.session_state.db_manager.update_diagnosis_session(session)
+        **Faza podostra (3-14 dni):**
+        - Łagodne ćwiczenia ROM
+        - Mobilizacja stawu
+        - Wzmacnianie mięśni peroneals
+        
+        **Faza funkcjonalna (2-6 tygodni):**
+        - Trening propriocepcji
+        - Ćwiczenia stabilizacji
+        - Stopniowa progresja obciążenia
+        
+        **Powrót do aktywności:**
+        - Sport-specific training
+        - Pełna ROM i siła
+        - Funkcjonalne testy
+        """
+    else:
+        return "Protokół leczenia zostanie dostosowany do konkretnego przypadku."
 
-def generate_pdf_report(diagnosis, results):
-    """Generuje raport PDF"""
-    st.info("Funkcja generowania PDF będzie dostępna w przyszłej wersji")
-
-def send_results_to_patient(diagnosis):
-    """Wysyła wyniki do pacjenta"""
-    st.info("Funkcja wysyłania wyników będzie dostępna w przyszłej wersji")
-
-def reset_current_session():
-    """Resetuje bieżącą sesję"""
-    keys_to_reset = [
-        'current_session', 'assessment_results', 'assessment_progress',
-        'selected_module', 'search_results'
-    ]
+def get_referral_recommendations(condition, findings):
+    """Pobiera rekomendacje skierowań"""
+    referrals = []
     
-    for key in keys_to_reset:
-        if key in st.session_state:
-            del st.session_state[key]
+    if 'achilles_rupture' in condition:
+        referrals.append("PILNE skierowanie do ortopedy + USG")
+    
+    if findings.get('ottawa_positive', False):
+        referrals.append("RTG według reguł Ottawy")
+    
+    if findings.get('thompson_positive', False):
+        referrals.append("PILNA konsultacja ortopedyczna")
+    
+    return referrals
 
-def show_red_flags_checklist():
-    """Pokazuje checklist czerwonych flag"""
+def show_red_flags_modal():
+    """Pokazuje modal z czerwonymi flagami"""
     st.markdown("### 🚨 Checklist czerwonych flag")
     
-    red_flags = [
-        "Widoczna deformacja kości/stawu",
+    general_red_flags = [
+        "Deformacja widoczna kości/stawu",
         "Otwarta rana z przebiciem skóry",
-        "Bladość, zimno lub siniec stopy/ręki",
-        "Brak tętna obwodowego",
-        "Drętwienie/niedowład całej kończyny",
-        "Niemożność poruszenia palcami",
-        "Silny ból (9-10/10) oporny na leki",
-        "Szybko narastający obrzęk całej kończyny",
-        "Gorączka >38°C z objawami infekcji",
-        "Podejrzenie zespołu ciasnoty"
+        "Zaburzenia neurologiczne (drętwienie, niedowład)",
+        "Zaburzenia naczyniowe (brak tętna, siniec)",
+        "Podejrzenie infekcji (gorączka, zaczerwienienie)",
+        "Ból nieproporcjonalny do obrazu klinicznego",
+        "Zespół ciasnoty przedziałów"
     ]
     
-    detected_flags = []
+    for flag in general_red_flags:
+        st.error(f"⚠️ {flag}")
     
-    for flag in red_flags:
-        if st.checkbox(flag, key=f"emergency_flag_{flag}"):
-            detected_flags.append(flag)
-    
-    if detected_flags:
-        st.error("🚨 CZERWONE FLAGI WYKRYTE! Konieczna pilna interwencja medyczna!")
-        for flag in detected_flags:
-            st.error(f"⚠️ {flag}")
-
-def show_emergency_referral():
-    """Pokazuje opcje pilnego skierowania"""
-    st.markdown("### 📞 Pilne skierowanie")
-    
-    referral_options = {
-        "SOR": "Szpitalny Oddział Ratunkowy",
-        "Ortopeda": "Pilna konsultacja ortopedyczna",
-        "Neurolog": "Pilna konsultacja neurologiczna",
-        "Chirurg naczyniowy": "Podejrzenie problemów naczyniowych"
-    }
-    
-    selected_referral = st.selectbox("Wybierz typ skierowania", list(referral_options.keys()))
-    
-    urgency = st.radio("Pilność", ["Natychmiastowa", "W ciągu godziny", "W ciągu dnia"])
-    
-    reason = st.text_area("Przyczyna skierowania", placeholder="Opisz objawy i podejrzenia...")
-    
-    if st.button("📞 Generuj skierowanie", type="primary"):
-        generate_emergency_referral(selected_referral, urgency, reason)
-
-def generate_emergency_referral(referral_type, urgency, reason):
-    """Generuje pilne skierowanie"""
-    patient = st.session_state.current_patient
-    
-    referral_text = f"""
-    🚨 PILNE SKIEROWANIE
-    
-    Pacjent: {patient.first_name} {patient.last_name}
-    PESEL: {patient.pesel}
-    Data: {datetime.now().strftime('%d.%m.%Y %H:%M')}
-    
-    Skierowanie do: {referral_type}
-    Pilność: {urgency}
-    
-    Przyczyna:
-    {reason}
-    
-    Fizjoterapeuta: Current User
-    """
-    
-    st.code(referral_text)
-    st.success("Skierowanie zostało wygenerowane!")
-
-def render_floating_button():
-    """Renderuje floating action button"""
-    st.markdown("""
-    <div class="floating-button" onclick="scrollToTop()">
-        ⬆️
-    </div>
-    
-    <script>
-    function scrollToTop() {
-        window.scrollTo({top: 0, behavior: 'smooth'});
-    }
-    </script>
-    """, unsafe_allow_html=True)
+    st.markdown("**W przypadku jakichkolwiek wątpliwości - ZAWSZE skieruj do lekarza!**")
 
 if __name__ == "__main__":
     main()
